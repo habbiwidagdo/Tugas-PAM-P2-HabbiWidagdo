@@ -1,39 +1,128 @@
-This is a Kotlin Multiplatform project targeting Android, iOS, Server.
+# NewsFeedSimulator - Kotlin Multiplatform (JVM / Desktop Target)
 
-* [/app/iosApp](./app/iosApp/iosApp) contains an iOS application. Even if you’re sharing your UI with Compose Multiplatform,
-  you need this entry point for your iOS app. This is also where you should add SwiftUI code for your project.
+Aplikasi **NewsFeedSimulator** adalah proyek Kotlin Multiplatform yang mensimulasikan aliran berita (news feed) secara real-time menggunakan Kotlin Coroutines dan Flows.
 
-* [/app/shared](./app/shared/src) is for code that will be shared across your Compose Multiplatform applications.
-  It contains several subfolders:
-  - [commonMain](./app/shared/src/commonMain/kotlin) is for code that’s common for all targets.
-  - Other folders are for Kotlin code that will be compiled for only the platform indicated in the folder name.
-    For example, if you want to use Apple’s CoreCrypto for the iOS part of your Kotlin app,
-    the [iosMain](./app/shared/src/iosMain/kotlin) folder would be the right place for such calls.
-    Similarly, if you want to edit the Desktop (JVM) specific part, the [jvmMain](./app/shared/src/jvmMain/kotlin)
-    folder is the appropriate location.
+---
+## Data Diri
 
-* [/core](./core/src) is for the code that will be shared between all targets in the project.
-  The most important subfolder is [commonMain](./core/src/commonMain/kotlin). If preferred, you
-  can add code to the platform-specific folders here too.
-
-* [/server](./server/src/main/kotlin) is for the Ktor server application.
-
-### Running the apps
-
-Use the run configurations provided by the run widget in your IDE's toolbar. You can also use these commands and options:
-
-- Android app: `./gradlew :app:androidApp:assembleDebug`
-- Server: `./gradlew :server:run`
-- iOS app: open the [/app/iosApp](./app/iosApp) directory in Xcode and run it from there.
-
-### Running tests
-
-Use the run button in your IDE's editor gutter, or run tests using Gradle tasks:
-
-- Android tests: `./gradlew :app:shared:testAndroidHostTest`
-- Server tests: `./gradlew :server:test`
-- iOS tests: `./gradlew :app:shared:iosSimulatorArm64Test`
+Nama    : Habbi Widagdo  
+NIM     : 123140204  
+Kelas   : Pengembangan Aplikasi Mobile RA
 
 ---
 
-Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html)…
+## 1. Lokasi File Aplikasi
+
+File utama logika aplikasi berada pada modul shared untuk target JVM/Desktop:
+- [`Platform.jvm.kt`](./app/shared/src/jvmMain/kotlin/com/example/newsfeedsimulator/Platform.jvm.kt)
+
+---
+
+## 2. Alur Logika (Logic Flow)
+
+Alur kerja aplikasi dirancang secara reaktif dan asinkron tanpa memerlukan input interaktif dari pengguna:
+1. **Inisialisasi ViewModel & Repository**: `NewsViewModel` diinisialisasi dengan `NewsRepository` yang menyimpan daftar data berita statis.
+2. **StateFlow Pengamatan Jumlah Baca**: `readCount` (StateFlow) memantau jumlah berita yang telah dibaca dan mencetak perubahannya secara real-time.
+3. **Flow Simulasi Berita & Filter/Transformasi**:
+   - `newsFlow()` memancarkan data berita baru secara berurutan setiap **2 detik**.
+   - Berita difilter berdasarkan kategori tertentu (misal: `"Technology"`).
+   - Data berita ditransformasikan ke format tampilan (`NewsUiModel`).
+4. **Coroutine Detail Berita**: Setiap kali berita diterima, aplikasi memanggil fungsi suspend untuk mengambil detail berita secara asynchronous dengan simulasi delay jaringan selama **1 detik**.
+
+### Hasil Luaran
+
+![Output](img/output.png)
+
+---
+
+## 3. Penjelasan Kode per Fitur
+
+### A. Flow Simulasi Berita Baru (Setiap 2 Detik)
+Berita dipancarkan satu per satu secara periodik menggunakan `flow` builder dan `delay(2000)`.
+
+```kotlin
+fun newsFlow(): Flow<News> = flow {
+    for (news in newsList) {
+        emit(news)
+        delay(2000) // Delay 2 detik antar berita
+    }
+}
+```
+
+### B. Filter Berita Berdasarkan Kategori
+Operator `.filter` digunakan untuk menyaring berita hanya untuk kategori tertentu (misalnya `"Technology"`).
+
+```kotlin
+fun getFilteredAndTransformedNewsFlow(targetCategory: String): Flow<NewsUiModel> {
+    return newsRepository.newsFlow()
+        .filter { it.category == targetCategory }
+        .map { news ->
+            NewsUiModel(
+                displayTitle = "[BREAKING] ${news.title}",
+                categoryLabel = news.category.uppercase()
+            )
+        }
+}
+```
+
+### C. Transformasi Data Menjadi Format Tampilan
+Operator `.map` mengubah entitas `News` mentah menjadi `NewsUiModel` yang siap ditampilkan di UI.
+
+```kotlin
+data class NewsUiModel(
+    val displayTitle: String,
+    val categoryLabel: String
+)
+```
+
+### D. StateFlow untuk Menyimpan Jumlah Berita yang Sudah Dibaca
+Menggunakan `MutableStateFlow` untuk menyimpan status reaktif jumlah berita yang telah dibaca/diproses.
+
+```kotlin
+private val _readCount = MutableStateFlow(0)
+val readCount: StateFlow<Int> = _readCount.asStateFlow()
+
+fun markNewsAsRead() {
+    _readCount.value++
+}
+```
+
+### E. Coroutines untuk Mengambil Detail Berita secara Async
+Fungsi `suspend` dengan `delay(1000)` mensimulasikan operasi jaringan asynchronous (network call) untuk mengambil detail berita berdasarkan ID.
+
+```kotlin
+suspend fun getNewsDetail(id: Int): News? {
+    delay(1000) // Simulasi network delay
+    return newsList.find { it.id == id }
+}
+```
+
+---
+
+## 4. Setup Environment & Konfigurasi Gradle
+
+Untuk menjalankan aplikasi ini pada target JVM (Desktop), environment proyek Kotlin Multiplatform perlu dikonfigurasi dengan menambahkan target `jvm()` pada file build Gradle shared module.
+
+### Konfigurasi Target JVM dan COROUTINES di `app/shared/build.gradle.kts`:
+
+```kotlin
+kotlin {
+    jvm() // Mengaktifkan target JVM/Desktop
+    
+    sourceSets {
+        commonMain.dependencies {
+            implementation(libs.compose.runtime)
+            implementation(libs.compose.foundation)
+            implementation(libs.compose.material3)
+            // Coroutines Dependency
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+        }
+    }
+}
+```
+
+### Cara Menjalankan Simulasi (JVM):
+Anda dapat menjalankan fungsi `main` langsung dari IDE (Android Studio / IntelliJ IDEA) pada file [`Platform.jvm.kt`](./app/shared/src/jvmMain/kotlin/com/example/newsfeedsimulator/Platform.jvm.kt) atau melalui Gradle:
+```bash
+./gradlew :app:shared:run
+```

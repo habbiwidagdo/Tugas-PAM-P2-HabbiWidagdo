@@ -8,6 +8,7 @@ plugins {
 }
 
 kotlin {
+    jvm()
     listOf(
         iosArm64(),
         iosSimulatorArm64()
@@ -54,6 +55,7 @@ kotlin {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
